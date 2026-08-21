@@ -1,0 +1,38 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: docintel
+      POSTGRES_PASSWORD: docintel
+      POSTGRES_DB: docintel
+    ports:
+      - "5433:5432" # 5433 on the host to avoid colliding with any local Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docintel -d docintel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The app is a CLI, not a daemon (until the API phase), so it sits behind a
+  # profile: `docker compose up` starts only the database, and pipeline steps
+  # run on demand via `docker compose run --rm app docintel <command>`.
+  app:
+    build: .
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://docintel:docintel@db:5432/docintel
+      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT:?set EDGAR_USER_AGENT in .env (Name email@domain.com)}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-pgvector}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  pgdata:

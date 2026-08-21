@@ -1,0 +1,8 @@
+# Runtime dependencies — pinned. Heavier layers (embedding, agent, serving)
+# are added in the phase that introduces them, so every pin is accountable.
+typer==0.15.1
+click==8.1.8  # typer 0.15 breaks against click >= 8.2 (make_metavar signature change)
+pydantic==2.10.4
+pydantic-settings==2.7.1
+httpx==0.28.1
+psycopg[binary]==3.2.3

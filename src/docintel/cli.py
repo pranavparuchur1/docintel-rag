@@ -6,6 +6,7 @@ wrapper around these same commands, so orchestration never hides behavior.
 
 from __future__ import annotations
 
+import logging
 import sys
 
 import typer
@@ -16,6 +17,15 @@ from docintel.config import ConfigError, get_settings
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 db_app = typer.Typer(no_args_is_help=True)
 app.add_typer(db_app, name="db", help="Database utilities (migrations, health).")
+
+
+@app.callback()
+def _configure(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
 
 def _settings():
@@ -74,7 +84,25 @@ def ingest(
     limit: int = typer.Option(3, help="Max filings per form type."),
 ) -> None:
     """Download filings from SEC EDGAR into the raw store + documents table."""
-    _not_yet("Phase 1 (ingestion)")
+    from docintel import db
+    from docintel.ingest.edgar_client import EdgarClient
+    from docintel.ingest.service import ingest_documents
+
+    settings = _settings()
+    with (
+        db.connect(settings) as conn,
+        EdgarClient(
+            settings.edgar_user_agent,
+            max_requests_per_sec=settings.edgar_max_requests_per_sec,
+        ) as client,
+    ):
+        stats = ingest_documents(
+            conn, client, settings, cik=cik, forms=forms.split(","), limit=limit
+        )
+    typer.echo(
+        f"selected={stats.selected} downloaded={stats.downloaded} "
+        f"skipped={stats.skipped} refreshed={stats.refreshed} by_form={stats.by_form}"
+    )
 
 
 @app.command()

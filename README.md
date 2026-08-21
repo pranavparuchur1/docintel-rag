@@ -31,7 +31,17 @@ docker compose build app
 docker compose run --rm app docintel db upgrade
 docker compose run --rm app docintel db check
 make test                     # unit tests (any Python >= 3.11 env with requirements-dev.txt)
+
+# ingest one company (Apple), or the whole 6-company corpus:
+docker compose run --rm app docintel ingest --cik 320193 --forms 10-K,10-Q --limit 2
+make corpus
 ```
+
+Ingestion is idempotent: re-running the same command re-downloads nothing and
+duplicates nothing (the EDGAR accession number is the natural key). The EDGAR
+client throttles below SEC's ~10 req/s fair-access cap, sends the required
+identifying User-Agent, honors `Retry-After`, and backs off exponentially with
+jitter on 429/5xx.
 
 ## Layout
 

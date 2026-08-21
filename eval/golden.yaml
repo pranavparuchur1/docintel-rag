@@ -1,0 +1,334 @@
+# Golden question set — 50 questions (42 in-corpus, 8 out-of-corpus).
+#
+# HONESTY CONTRACT:
+# - Drafted with LLM assistance, anchored to phrases mechanically confirmed to
+#   exist in the corpus (`docintel check-golden` fails on any spec matching 0
+#   chunks).
+# - `verified: true` is set ONLY after a human has read the question against
+#   the actual filing and confirmed the expected source genuinely answers it.
+#   The eval report prints the verified count; unverified questions are a
+#   stated limitation, not a hidden one.
+#
+# Spec semantics (src/docintel/eval/golden.py): a chunk is relevant iff it
+# matches ALL declared fields of at least one spec. With require: all (default)
+# recall@k gives partial credit per spec — cross-company/temporal questions
+# need EVERY source covered for full credit. require: any marks specs as
+# alternates: retrieving any one of them fully answers the question.
+
+# ---------------------------------------------------------------- single_fact
+- id: sf01
+  type: single_fact
+  question: What risks does Nvidia face from U.S. export controls on sales to China?
+  expected:
+    - {company: NVIDIA CORP, section_prefix: Item 1A, must_contain: export control}
+
+- id: sf02
+  type: single_fact
+  question: How does Tesla describe its dependence on Elon Musk?
+  expected:
+    - {company: "Tesla, Inc.", section_prefix: Item 1A, must_contain: Elon Musk}
+
+- id: sf03
+  type: single_fact
+  question: How could concerns about obesity and health affect demand for Coca-Cola's products?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: obesity}
+
+- id: sf04
+  type: single_fact
+  question: What risks arise from Apple's reliance on outsourcing partners for manufacturing?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: outsourcing partners}
+
+- id: sf05
+  type: single_fact
+  question: Why is Apple's supply chain exposed to risks concentrated in Taiwan?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: Taiwan}
+
+- id: sf06
+  type: single_fact
+  question: What cybersecurity threats does Microsoft identify in its risk factors?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: cybersecurity}
+
+- id: sf07
+  type: single_fact
+  question: How does JPMorgan describe the risks interest rate changes pose to its business?
+  expected:
+    - {company: JPMORGAN CHASE & CO, section_prefix: Item 1A, must_contain: interest rate}
+
+- id: sf08
+  type: single_fact
+  question: Why is water scarcity a business risk for Coca-Cola?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: water}
+
+- id: sf09
+  type: single_fact
+  question: What geopolitical supply-chain risks does Nvidia face related to Taiwan?
+  expected:
+    - {company: NVIDIA CORP, section_prefix: Item 1A, must_contain: Taiwan}
+
+- id: sf10
+  type: single_fact
+  question: How do trade restrictions and export controls affect Microsoft's cloud business?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: export control}
+
+- id: sf11
+  type: single_fact
+  question: How does the EU Digital Markets Act affect Apple's App Store business?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: Digital Markets Act}
+
+- id: sf12
+  type: single_fact
+  question: What regulatory risks does Tesla face related to Autopilot and self-driving features?
+  expected:
+    - {company: "Tesla, Inc.", section_prefix: Item 1A, must_contain: Autopilot}
+
+- id: sf13
+  type: single_fact
+  question: What drove growth in Nvidia's Data Center revenue?
+  expected:
+    - {company: NVIDIA CORP, section_prefix: Item 7, must_contain: data center}
+
+- id: sf14
+  type: single_fact
+  question: How did Apple's Services segment revenue perform?
+  require: any   # the fact lives in the 10-K's Item 7 AND the 10-Qs' Item 2 MD&A
+  expected:
+    - {company: Apple Inc., form_type: 10-K, section_prefix: Item 7, must_contain: services}
+    - {company: Apple Inc., form_type: 10-Q, section_prefix: Item 2, must_contain: services}
+
+- id: sf15
+  type: single_fact
+  question: What did Microsoft return to shareholders through dividends and buybacks?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 7, must_contain: dividend}
+
+- id: sf16
+  type: single_fact
+  question: How does Coca-Cola's concentrate operations business model work?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 7, must_contain: concentrate}
+
+- id: sf17
+  type: single_fact
+  question: What factors affected Apple's gross margin?
+  require: any   # 10-K Item 7 or 10-Q Item 2 MD&A both answer this
+  expected:
+    - {company: Apple Inc., form_type: 10-K, section_prefix: Item 7, must_contain: gross margin}
+    - {company: Apple Inc., form_type: 10-Q, section_prefix: Item 2, must_contain: gross margin}
+
+- id: sf18
+  type: single_fact
+  question: How did Tesla's automotive revenue change and why?
+  expected:
+    - {company: "Tesla, Inc.", section_prefix: Item 7, must_contain: automotive revenue}
+
+- id: sf19
+  type: single_fact
+  question: How does Microsoft account for goodwill in its financial statements?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 8, must_contain: goodwill}
+
+- id: sf20
+  type: single_fact
+  question: What does Apple disclose about its provision for income taxes?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 8, must_contain: income taxes}
+
+- id: sf21
+  type: single_fact
+  question: How does climate change create risks for JPMorgan?
+  expected:
+    - {company: JPMORGAN CHASE & CO, section_prefix: Item 1A, must_contain: climate change}
+
+- id: sf22
+  type: single_fact
+  question: How is Coca-Cola exposed to foreign currency exchange rate fluctuations?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: foreign currency}
+
+- id: sf23
+  type: single_fact
+  question: What are the risks Apple identifies around artificial intelligence features?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: artificial intelligence}
+
+- id: sf24
+  type: single_fact
+  question: How did Microsoft's Intelligent Cloud segment perform?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 7, must_contain: Intelligent Cloud}
+
+# ------------------------------------------------------------- cross_company
+- id: cc01
+  type: cross_company
+  question: Compare how Apple and Microsoft describe risks from artificial intelligence.
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: artificial intelligence}
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: artificial intelligence}
+
+- id: cc02
+  type: cross_company
+  question: How do Nvidia and Microsoft each describe the impact of export controls?
+  expected:
+    - {company: NVIDIA CORP, section_prefix: Item 1A, must_contain: export control}
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: export control}
+
+- id: cc03
+  type: cross_company
+  question: Compare the climate-change risks disclosed by Coca-Cola and JPMorgan.
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: climate change}
+    - {company: JPMORGAN CHASE & CO, section_prefix: Item 1A, must_contain: climate change}
+
+- id: cc04
+  type: cross_company
+  question: How do Microsoft and Nvidia each frame cybersecurity risk?
+  expected:
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: cybersecurity}
+    - {company: NVIDIA CORP, section_prefix: Item 1A, must_contain: cybersecurity}
+
+- id: cc05
+  type: cross_company
+  question: Compare Apple's and Nvidia's disclosed exposure to Taiwan.
+  expected:
+    - {company: Apple Inc., section_prefix: Item 1A, must_contain: Taiwan}
+    - {company: NVIDIA CORP, section_prefix: Item 1A, must_contain: Taiwan}
+
+- id: cc06
+  type: cross_company
+  question: How do Coca-Cola and Microsoft describe water-related sustainability risks?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: water}
+    - {company: MICROSOFT CORP, section_prefix: Item 1A, must_contain: water}
+
+- id: cc07
+  type: cross_company
+  question: Compare how JPMorgan and Coca-Cola discuss interest rate risk.
+  expected:
+    - {company: JPMORGAN CHASE & CO, section_prefix: Item 1A, must_contain: interest rate}
+    - {company: COCA COLA CO, section_prefix: Item 1A, must_contain: interest rate}
+
+- id: cc08
+  type: cross_company
+  question: What do Apple and Microsoft report about share repurchase programs?
+  expected:
+    - {company: Apple Inc., section_prefix: Item 7, must_contain: share repurchase}
+    - {company: MICROSOFT CORP, section_prefix: Item 7, must_contain: share repurchase}
+
+- id: cc09
+  type: cross_company
+  question: Compare the gross margin discussion in Nvidia's and Tesla's MD&A.
+  expected:
+    - {company: NVIDIA CORP, section_prefix: Item 7, must_contain: gross margin}
+    - {company: "Tesla, Inc.", section_prefix: Item 7, must_contain: gross margin}
+
+- id: cc10
+  type: cross_company
+  question: How do Coca-Cola and Microsoft describe their dividend policies?
+  expected:
+    - {company: COCA COLA CO, section_prefix: Item 7, must_contain: dividend}
+    - {company: MICROSOFT CORP, section_prefix: Item 7, must_contain: dividend}
+
+# ------------------------------------------------------------------ temporal
+- id: tp01
+  type: temporal
+  question: How did Apple's gross margin discussion change between its fiscal 2024 and fiscal 2025 annual reports?
+  expected:
+    - {accession: 0000320193-24-000123, section_prefix: Item 7, must_contain: gross margin}
+    - {accession: 0000320193-25-000079, section_prefix: Item 7, must_contain: gross margin}
+
+- id: tp02
+  type: temporal
+  question: How did Nvidia's export-control risk disclosure evolve between its last two 10-K filings?
+  expected:
+    - {accession: 0001045810-25-000023, section_prefix: Item 1A, must_contain: export control}
+    - {accession: 0001045810-26-000021, section_prefix: Item 1A, must_contain: export control}
+
+- id: tp03
+  type: temporal
+  question: How did Nvidia's Data Center results change between its last two annual reports?
+  expected:
+    - {accession: 0001045810-25-000023, section_prefix: Item 7, must_contain: data center}
+    - {accession: 0001045810-26-000021, section_prefix: Item 7, must_contain: data center}
+
+- id: tp04
+  type: temporal
+  question: Compare Tesla's gross margin discussion across its two most recent 10-Ks.
+  expected:
+    - {accession: 0001628280-25-003063, section_prefix: Item 7, must_contain: gross margin}
+    - {accession: 0001628280-26-003952, section_prefix: Item 7, must_contain: gross margin}
+
+- id: tp05
+  type: temporal
+  question: How did Microsoft's dividend and buyback disclosures change year over year in MD&A?
+  expected:
+    - {accession: 0000950170-25-100235, section_prefix: Item 7, must_contain: dividend}
+    - {accession: 0001193125-26-323660, section_prefix: Item 7, must_contain: dividend}
+
+- id: tp06
+  type: temporal
+  question: How did Coca-Cola's concentrate business discussion change between its two most recent annual reports?
+  expected:
+    - {accession: 0000021344-25-000011, section_prefix: Item 7, must_contain: concentrate}
+    - {accession: 0001628280-26-010047, section_prefix: Item 7, must_contain: concentrate}
+
+- id: tp07
+  type: temporal
+  question: Did Apple's Taiwan-related risk language change between its fiscal 2024 and 2025 10-Ks?
+  expected:
+    - {accession: 0000320193-24-000123, section_prefix: Item 1A, must_contain: Taiwan}
+    - {accession: 0000320193-25-000079, section_prefix: Item 1A, must_contain: Taiwan}
+
+- id: tp08
+  type: temporal
+  question: How did Microsoft's gross margin commentary change between its last two annual reports?
+  expected:
+    - {accession: 0000950170-25-100235, section_prefix: Item 7, must_contain: gross margin}
+    - {accession: 0001193125-26-323660, section_prefix: Item 7, must_contain: gross margin}
+
+# ------------------------------------------------------------- out_of_corpus
+- id: oc01
+  type: out_of_corpus
+  question: What is the capital of France?
+  refuse: true
+
+- id: oc02
+  type: out_of_corpus
+  question: What was Amazon's AWS revenue last year?
+  refuse: true
+
+- id: oc03
+  type: out_of_corpus
+  question: What antitrust risks does Alphabet disclose in its 10-K?
+  refuse: true
+
+- id: oc04
+  type: out_of_corpus
+  question: What is the current federal funds rate?
+  refuse: true
+
+- id: oc05
+  type: out_of_corpus
+  question: Will Bitcoin's price go up next quarter?
+  refuse: true
+
+- id: oc06
+  type: out_of_corpus
+  question: What supply chain risks does Walmart report?
+  refuse: true
+
+- id: oc07
+  type: out_of_corpus
+  question: Who is the chief financial officer of Netflix?
+  refuse: true
+
+- id: oc08
+  type: out_of_corpus
+  question: What were the terms of Twitter's acquisition by Elon Musk?
+  refuse: true

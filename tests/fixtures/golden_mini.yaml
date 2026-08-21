@@ -1,0 +1,29 @@
+# Tiny golden set for the eval smoke test against the MiniCorp fixture corpus.
+- id: g1
+  type: single_fact
+  question: What risks does MiniCorp face from its contract manufacturer?
+  expected:
+    - company: MiniCorp Inc.
+      section_prefix: "Item 1A"
+      must_contain: contract manufacturer
+
+- id: g2
+  type: single_fact
+  question: How did MiniCorp's net revenue change in fiscal 2025?
+  expected:
+    - company: MiniCorp Inc.
+      section_prefix: "Item 7"
+      must_contain: revenue
+
+- id: g3
+  type: out_of_corpus
+  question: What is the population of France?
+  refuse: true
+
+- id: g4
+  type: single_fact
+  question: What were MiniCorp's operating results?
+  require: any # either MD&A spec alone fully answers
+  expected:
+    - {company: MiniCorp Inc., section_prefix: "Item 7", must_contain: operating income}
+    - {company: MiniCorp Inc., section_prefix: "Item 7", must_contain: revenue}

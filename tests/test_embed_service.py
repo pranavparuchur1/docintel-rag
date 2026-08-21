@@ -2,40 +2,13 @@
 second run embeds zero; identical-param re-chunk embeds zero; a param change
 creates a NEW index version while the old one's vectors are untouched."""
 
-import hashlib
-
 import pytest
 
 from docintel.chunk.service import chunk_documents
 from docintel.chunk.strategies import get_strategies
-from docintel.embed.providers import EmbeddingProvider, LocalBgeProvider, get_provider
+from docintel.embed.providers import LocalBgeProvider, get_provider
 from docintel.embed.service import embed_pending, get_or_create_index_version
-
-
-class FakeProvider(EmbeddingProvider):
-    """Deterministic 8-dim vectors derived from the text hash. No network."""
-
-    model_name = "fake-embedder-8d"
-
-    def __init__(self):
-        self.calls = 0
-
-    @property
-    def dim(self) -> int:
-        return 8
-
-    def embed_passages(self, texts):
-        self.calls += len(texts)
-        out = []
-        for text in texts:
-            digest = hashlib.sha256(text.encode()).digest()
-            vec = [b / 255.0 for b in digest[:8]]
-            norm = sum(x * x for x in vec) ** 0.5
-            out.append([x / norm for x in vec])
-        return out
-
-    def embed_query(self, text):
-        return self.embed_passages([text])[0]
+from fake_provider import FakeProvider
 
 
 def test_embed_is_incremental_and_versions_are_isolated(seeded_corpus):

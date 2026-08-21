@@ -19,6 +19,6 @@ def test_version():
     assert __version__ in result.output
 
 
-def test_unimplemented_commands_exit_nonzero():
+def test_query_requires_index_version():
     result = runner.invoke(app, ["query", "anything"])
-    assert result.exit_code == 2
+    assert result.exit_code == 2  # typer: missing required --index-version

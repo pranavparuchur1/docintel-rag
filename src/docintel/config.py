@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     openai_api_key: str | None = None
 
+    # --- Retrieval -------------------------------------------------------------
+    # Refuse to answer when the top-1 cosine similarity falls below this.
+    # Chosen from the eval report's threshold sweep (docs/eval/): at 0.68,
+    # refusal precision 1.00 / recall 0.50 on the hard-negative OOC set —
+    # cosine alone cannot detect entity absence (e.g. "Walmart's supply chain"
+    # retrieves other companies' supply-chain text at high similarity); the
+    # Phase 5 relevance grader is the second line of defense.
+    refusal_threshold: float = 0.68
+
     # --- Storage ---------------------------------------------------------------
     data_dir: Path = Path("./data")
 

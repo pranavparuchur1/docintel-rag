@@ -13,3 +13,4 @@ selectolax==0.4.11
 tiktoken==0.14.0  # token counter for chunk sizing/stats only (approximates bge's WordPiece)
 torch==2.6.0
 sentence-transformers==3.3.1
+pyyaml==6.0.2

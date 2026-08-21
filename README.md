@@ -71,6 +71,49 @@ serving. Measured on this corpus (bge-small-en-v1.5, CPU): first full embed of
 chunks in 7.7 s**. Rationale in
 [ADR 0002](docs/decisions/0002-content-addressed-versioned-embeddings.md).
 
+## Retrieval quality (measured)
+
+Evaluated on a 50-question golden set (42 in-corpus, 8 out-of-corpus hard
+negatives) with `docintel eval`; full report incl. per-type breakdown,
+refusal-threshold sweep, and misses in
+[docs/eval/comparison_2026-08-21.md](docs/eval/comparison_2026-08-21.md).
+**Verification status: every question's ground truth is mechanically confirmed
+to exist in the corpus (`docintel check-golden`), 0/50 human-verified so far —
+that count is printed in every report and is a stated limitation until closed.**
+
+| configuration | recall@1 | recall@5 | recall@10 | MRR@10 | nDCG@10 | refusal P / R | p95 |
+|---|---|---|---|---|---|---|---|
+| fixed(350/60) / vector | 0.39 | 0.60 | 0.67 | 0.54 | 0.33 | 1.00 / 0.38 | 47ms |
+| fixed(350/60) / hybrid | 0.40 | 0.60 | 0.65 | 0.53 | 0.34 | 1.00 / 0.38 | 63ms |
+| recursive(350) / vector | 0.35 | 0.55 | 0.72 | 0.51 | 0.34 | 1.00 / 0.50 | 36ms |
+| recursive(350) / hybrid | 0.38 | 0.57 | 0.72 | 0.53 | 0.34 | 1.00 / 0.50 | 44ms |
+| **section_aware(350) / hybrid** | **0.40** | **0.60** | 0.67 | **0.55** | **0.35** | **1.00 / 0.50** | 44ms |
+| section_aware(350) / vector | 0.36 | 0.57 | 0.67 | 0.52 | 0.34 | 1.00 / 0.50 | 40ms |
+| section_aware(250) / vector | 0.40 | 0.51 | 0.70 | 0.52 | 0.32 | 1.00 / 0.38 | 36ms |
+| section_aware(250) / hybrid | 0.42 | 0.54 | 0.70 | 0.54 | 0.32 | 1.00 / 0.38 | 38ms |
+
+What the numbers actually say (caveat: 42 in-corpus questions, so one question
+moves recall by ~0.024 — differences under ~0.05 are noise):
+
+- **section_aware/hybrid leads on MRR, nDCG and refusal recall; recall@5 is a
+  statistical tie with fixed.** Hypothesis: section boundaries stop chunks from
+  bleeding between Risk Factors and MD&A (better ranking, exact citations), and
+  the full-text leg catches exact terms cosine blurs ("Intelligent Cloud",
+  "Digital Markets Act"). Fixed's overlap buys competitive recall through
+  redundancy, but its duplicated boundary text wastes result slots.
+- **Smaller chunks (250) hurt recall@5** (0.54 vs 0.60): facts split across
+  more chunks compete for the same k slots.
+- **Single-fact recall@5 is 0.83; cross-company is 0.25–0.30 and temporal
+  0.12–0.31.** Single-shot retrieval rarely covers two sources in five slots —
+  this measured gap is exactly what the Phase 5 agent's per-company fan-out for
+  comparison queries exists to close, and the eval will be re-run through the
+  agent to prove it.
+- **Refusal at the swept threshold (0.68): precision 1.00, recall 0.50.**
+  Cosine similarity alone cannot detect entity absence — "What supply chain
+  risks does Walmart report?" retrieves other companies' supply-chain text at
+  high similarity. The Phase 5 relevance grader is the second line of defense;
+  its effect will be measured against the same golden set.
+
 ## Layout
 
 ```

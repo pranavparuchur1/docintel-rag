@@ -1,9 +1,13 @@
 import os
+import shutil
+from pathlib import Path
 
 import psycopg
 import pytest
 
 from docintel.config import Settings
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 VALID_UA = "Jane Doe jane@example.com"
 TEST_DB_URL = os.environ.get(
@@ -42,3 +46,24 @@ def conn():
         cur.execute("DROP SCHEMA test_docintel CASCADE")
     connection.commit()
     connection.close()
+
+
+@pytest.fixture
+def seeded_corpus(conn, settings):
+    """One MiniCorp 10-K row in documents, raw file under settings.data_dir."""
+    raw_rel = "raw/0000000001-25-000001/mini10k.html"
+    dest = settings.data_dir / raw_rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(FIXTURES / "mini10k.html", dest)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO documents (accession_no, cik, company, form_type, filing_date,
+                                   period, source_url, raw_path, content_hash, size_bytes)
+            VALUES ('0000000001-25-000001', '1', 'MiniCorp Inc.', '10-K', '2025-01-31',
+                    '2024-12-31', 'https://example.test/mini10k.html', %s, 'deadbeef', 1)
+            """,
+            (raw_rel,),
+        )
+    conn.commit()
+    return conn, settings

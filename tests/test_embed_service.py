@@ -5,7 +5,6 @@ creates a NEW index version while the old one's vectors are untouched."""
 import hashlib
 
 import pytest
-from tests.test_chunk_service import seed_document
 
 from docintel.chunk.service import chunk_documents
 from docintel.chunk.strategies import get_strategies
@@ -39,14 +38,8 @@ class FakeProvider(EmbeddingProvider):
         return self.embed_passages([text])[0]
 
 
-@pytest.fixture
-def corpus(conn, settings):
-    seed_document(conn, settings)
-    return conn, settings
-
-
-def test_embed_is_incremental_and_versions_are_isolated(corpus):
-    conn, settings = corpus
+def test_embed_is_incremental_and_versions_are_isolated(seeded_corpus):
+    conn, settings = seeded_corpus
     provider = FakeProvider()
     [strategy] = get_strategies(["recursive"])
     chunk_documents(conn, settings, [strategy])
@@ -88,8 +81,8 @@ def test_embed_is_incremental_and_versions_are_isolated(corpus):
         assert {r[0] for r in cur.fetchall()} == {"ready"}
 
 
-def test_version_requires_existing_chunks(corpus):
-    conn, _settings = corpus
+def test_version_requires_existing_chunks(seeded_corpus):
+    conn, _settings = seeded_corpus
     [strategy] = get_strategies(["fixed"])
     with pytest.raises(ValueError, match="run `docintel chunk`"):
         get_or_create_index_version(conn, FakeProvider(), strategy)

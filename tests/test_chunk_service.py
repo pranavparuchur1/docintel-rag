@@ -1,32 +1,9 @@
-import shutil
-from pathlib import Path
-
 from docintel.chunk.service import chunk_documents
 from docintel.chunk.strategies import get_strategies
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mini10k.html"
 
-
-def seed_document(conn, settings) -> None:
-    raw_rel = "raw/0000000001-25-000001/mini10k.html"
-    dest = settings.data_dir / raw_rel
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(FIXTURE, dest)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO documents (accession_no, cik, company, form_type, filing_date,
-                                   period, source_url, raw_path, content_hash, size_bytes)
-            VALUES ('0000000001-25-000001', '1', 'MiniCorp Inc.', '10-K', '2025-01-31',
-                    '2024-12-31', 'https://example.test/mini10k.html', %s, 'deadbeef', 1)
-            """,
-            (raw_rel,),
-        )
-    conn.commit()
-
-
-def test_chunk_documents_idempotent_and_forceable(conn, settings):
-    seed_document(conn, settings)
+def test_chunk_documents_idempotent_and_forceable(seeded_corpus):
+    conn, settings = seeded_corpus
     strategies = get_strategies(["recursive"])
 
     first = chunk_documents(conn, settings, strategies)

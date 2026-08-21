@@ -59,6 +59,18 @@ Three chunk strategies live behind one `ChunkStrategy` interface — `fixed`
 and `section_aware` (recursive, but never across a detected section boundary).
 Which one is *better* is a Phase 4 evaluation question; no claim is made here.
 
+## Embedding & the versioned index
+
+Embeddings are **content-addressed**: keyed by the SHA-256 of normalized chunk
+text, stored in per-version tables `embeddings_v<id>` (dimension-typed pgvector
+column + HNSW, cosine). An index version is the tuple
+`(embedding_model, chunk_strategy, chunk_params, schema_version)` — change any
+element and a new version builds in its own table while the old one keeps
+serving. Measured on this corpus (bge-small-en-v1.5, CPU): first full embed of
+15,365 vectors ≈ 25 min at ~10 chunks/s; the identical re-run embeds **0
+chunks in 7.7 s**. Rationale in
+[ADR 0002](docs/decisions/0002-content-addressed-versioned-embeddings.md).
+
 ## Layout
 
 ```

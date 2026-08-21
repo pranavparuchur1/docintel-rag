@@ -218,6 +218,11 @@ def eval_cmd(index_version: int = typer.Option(None, "--index-version")) -> None
 
 
 def main() -> None:
+    import logging
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     app()
 
 

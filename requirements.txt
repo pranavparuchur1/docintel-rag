@@ -6,3 +6,5 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 httpx==0.28.1
 psycopg[binary]==3.2.3
+selectolax==0.4.11
+tiktoken==0.14.0  # token counter for chunk sizing/stats only (approximates bge's WordPiece)

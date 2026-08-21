@@ -43,6 +43,22 @@ client throttles below SEC's ~10 req/s fair-access cap, sends the required
 identifying User-Agent, honors `Retry-After`, and backs off exponentially with
 jitter on 429/5xx.
 
+## Parsing & chunking (measured, not assumed)
+
+`docintel parse-report` measures section detection against the key answerable
+sections (10-K: Items 1, 1A, 7, 7A, 8; 10-Q: I.1, I.2, II.1A). On the current
+18-document corpus the hit rate is **76/76 = 100%**, verified not just by
+heading presence but by section content size (a mis-detected heading produces a
+near-empty section). Two real-world traps this heuristic had to survive:
+Microsoft prints bare `Item 1A` page headers on every page (titled headings now
+beat bare ones), and JPMorgan's Item 7 is genuinely ~400 chars because it
+incorporates MD&A by reference — a corpus limitation, not a parser bug.
+
+Three chunk strategies live behind one `ChunkStrategy` interface — `fixed`
+(350 tokens, 60 overlap), `recursive` (natural boundaries, merged up to 350),
+and `section_aware` (recursive, but never across a detected section boundary).
+Which one is *better* is a Phase 4 evaluation question; no claim is made here.
+
 ## Layout
 
 ```

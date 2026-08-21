@@ -106,6 +106,59 @@ def ingest(
 
 
 @app.command()
+def chunk(
+    strategy: str = typer.Option("all", help="fixed | recursive | section_aware | all"),
+    force: bool = typer.Option(False, help="Re-chunk even if chunks already exist."),
+) -> None:
+    """Parse raw filings and write chunks for the selected strategies."""
+    from docintel import db
+    from docintel.chunk.service import chunk_documents
+    from docintel.chunk.strategies import get_strategies
+
+    settings = _settings()
+    strategies = get_strategies(strategy.split(","))
+    with db.connect(settings) as conn:
+        stats = chunk_documents(conn, settings, strategies, force=force)
+    typer.echo(
+        f"documents={stats.documents} chunked={stats.chunked} skipped={stats.skipped} "
+        f"chunks_written={stats.chunks_written} by_strategy={stats.by_strategy}"
+    )
+
+
+@app.command("parse-report")
+def parse_report() -> None:
+    """Measure section-detection hit rate across the ingested corpus."""
+    from docintel import db
+    from docintel.parse import load_raw_text, parse_filing
+    from docintel.parse.sections import EXPECTED_ITEMS, section_hit_rate
+
+    settings = _settings()
+    with db.connect(settings) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT accession_no, company, form_type, raw_path FROM documents "
+            "WHERE form_type = ANY(%s) ORDER BY company, filing_date",
+            (list(EXPECTED_ITEMS),),
+        )
+        rows = cur.fetchall()
+
+    total_expected = total_found = 0
+    for accession_no, company, form_type, raw_path in rows:
+        parsed = parse_filing(load_raw_text(settings.data_dir / raw_path), form_type)
+        expected, found = section_hit_rate(parsed.sections, form_type)
+        total_expected += len(expected)
+        total_found += len(found)
+        missing = "".join(f" MISSING:{k}" for k in sorted(expected - found))
+        typer.echo(
+            f"{company[:24]:<24} {form_type:<5} {accession_no}  "
+            f"{len(found)}/{len(expected)} key sections "
+            f"({len(parsed.sections)} total detected){missing}"
+        )
+    if total_expected:
+        rate = 100.0 * total_found / total_expected
+        typer.echo(f"\nsection-detection hit rate: {total_found}/{total_expected} = {rate:.1f}%")
+
+
+@app.command()
 def embed() -> None:
     """Embed new/changed chunks into the target index version."""
     _not_yet("Phase 3 (embedding & versioned index)")

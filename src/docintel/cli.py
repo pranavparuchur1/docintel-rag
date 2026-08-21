@@ -109,6 +109,7 @@ def ingest(
 def chunk(
     strategy: str = typer.Option("all", help="fixed | recursive | section_aware | all"),
     force: bool = typer.Option(False, help="Re-chunk even if chunks already exist."),
+    max_tokens: int = typer.Option(None, help="Override the token budget (new params_hash)."),
 ) -> None:
     """Parse raw filings and write chunks for the selected strategies."""
     from docintel import db
@@ -116,7 +117,7 @@ def chunk(
     from docintel.chunk.strategies import get_strategies
 
     settings = _settings()
-    strategies = get_strategies(strategy.split(","))
+    strategies = get_strategies(strategy.split(","), max_tokens=max_tokens)
     with db.connect(settings) as conn:
         stats = chunk_documents(conn, settings, strategies, force=force)
     typer.echo(
@@ -159,9 +160,49 @@ def parse_report() -> None:
 
 
 @app.command()
-def embed() -> None:
-    """Embed new/changed chunks into the target index version."""
-    _not_yet("Phase 3 (embedding & versioned index)")
+def embed(
+    strategy: str = typer.Option("all", help="fixed | recursive | section_aware | all"),
+    batch_size: int = typer.Option(64, help="Texts per embedding batch."),
+    max_tokens: int = typer.Option(None, help="Target the chunk set built with this budget."),
+) -> None:
+    """Embed chunks whose content_hash is missing from the target index version."""
+    from docintel import db
+    from docintel.chunk.strategies import get_strategies
+    from docintel.embed.providers import get_provider
+    from docintel.embed.service import embed_pending, get_or_create_index_version
+
+    settings = _settings()
+    provider = get_provider(settings)
+    with db.connect(settings) as conn:
+        for strat in get_strategies(strategy.split(","), max_tokens=max_tokens):
+            version = get_or_create_index_version(conn, provider, strat)
+            stats = embed_pending(conn, provider, version, batch_size=batch_size)
+            typer.echo(
+                f"index_version={version.index_version_id} strategy={strat.name} "
+                f"params={strat.params_hash} embedded={stats.embedded} "
+                f"already_present={stats.already_present} total={stats.total_hashes}"
+            )
+
+
+@app.command("index-versions")
+def index_versions() -> None:
+    """List index versions with vector counts and status."""
+    from docintel import db
+    from docintel.embed.service import list_index_versions
+
+    settings = _settings()
+    with db.connect(settings) as conn:
+        versions = list_index_versions(conn)
+    if not versions:
+        typer.echo("no index versions yet — run `docintel embed`")
+        return
+    for v in versions:
+        typer.echo(
+            f"v{v['index_version_id']:<3} {v['status']:<8} {v['strategy']:<14} "
+            f"model={v['embedding_model']} params={v['chunk_params']} "
+            f"schema={v['schema_version']} vectors={v['vectors']}/{v['chunk_count']} "
+            f"created={v['created_at']:%Y-%m-%d %H:%M}"
+        )
 
 
 @app.command()

@@ -32,6 +32,7 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
       DATA_DIR: /app/data
       TIKTOKEN_CACHE_DIR: /app/data/.tiktoken  # cache the encoding across runs
+      HF_HOME: /app/data/.hf # embedding model downloads once into the mounted volume
     volumes:
       - ./data:/app/data
 

@@ -20,5 +20,5 @@ def test_version():
 
 
 def test_unimplemented_commands_exit_nonzero():
-    result = runner.invoke(app, ["embed"])
+    result = runner.invoke(app, ["query", "anything"])
     assert result.exit_code == 2

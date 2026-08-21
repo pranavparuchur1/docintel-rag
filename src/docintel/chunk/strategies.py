@@ -156,10 +156,21 @@ class SectionAwareChunker(ChunkStrategy):
         return self._finalize(doc, spans, self.min_tokens)
 
 
-def get_strategies(names: list[str] | None = None) -> list[ChunkStrategy]:
-    registry: dict[str, ChunkStrategy] = {
-        s.name: s for s in (FixedSizeChunker(), RecursiveChunker(), SectionAwareChunker())
-    }
+def get_strategies(
+    names: list[str] | None = None, max_tokens: int | None = None
+) -> list[ChunkStrategy]:
+    """max_tokens overrides the token budget (size_tokens for fixed) — used to
+    demonstrate that a param change creates a new params_hash and therefore a
+    new index version instead of polluting an existing one."""
+    if max_tokens is None:
+        instances = (FixedSizeChunker(), RecursiveChunker(), SectionAwareChunker())
+    else:
+        instances = (
+            FixedSizeChunker(size_tokens=max_tokens),
+            RecursiveChunker(max_tokens=max_tokens),
+            SectionAwareChunker(max_tokens=max_tokens),
+        )
+    registry: dict[str, ChunkStrategy] = {s.name: s for s in instances}
     if names is None or names == ["all"]:
         return list(registry.values())
     missing = [n for n in names if n not in registry]

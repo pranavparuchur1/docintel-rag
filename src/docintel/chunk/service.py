@@ -6,6 +6,7 @@ are skipped unless --force, which replaces them atomically.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 
@@ -34,6 +35,15 @@ def chunk_documents(
     force: bool = False,
 ) -> ChunkStats:
     stats = ChunkStats()
+    with conn.cursor() as cur:
+        # Register each strategy's params so index versions can record exactly
+        # how their chunks were produced (chunks rows carry only the hash).
+        cur.executemany(
+            "INSERT INTO chunk_param_sets (strategy, params_hash, params) "
+            "VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+            [(s.name, s.params_hash, json.dumps(s.params)) for s in strategies],
+        )
+        conn.commit()
     with conn.cursor() as cur:
         cur.execute(
             "SELECT accession_no, company, form_type, raw_path FROM documents ORDER BY accession_no"

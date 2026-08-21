@@ -1,5 +1,8 @@
 # Runtime dependencies — pinned. Heavier layers (embedding, agent, serving)
 # are added in the phase that introduces them, so every pin is accountable.
+# CPU-only torch wheels (2.6.0+cpu sorts above 2.6.0, so pip picks it from
+# this index) — keeps the image free of ~2GB of CUDA libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
 typer==0.15.1
 click==8.1.8  # typer 0.15 breaks against click >= 8.2 (make_metavar signature change)
 pydantic==2.10.4
@@ -8,3 +11,5 @@ httpx==0.28.1
 psycopg[binary]==3.2.3
 selectolax==0.4.11
 tiktoken==0.14.0  # token counter for chunk sizing/stats only (approximates bge's WordPiece)
+torch==2.6.0
+sentence-transformers==3.3.1

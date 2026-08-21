@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # retrieves other companies' supply-chain text at high similarity); the
     # Phase 5 relevance grader is the second line of defense.
     refusal_threshold: float = 0.68
+    # Queries that name no corpus company lack an entity anchor and must clear
+    # a higher bar (generic prose scores ~0.7 against something in 15k chunks).
+    refusal_threshold_no_entity: float = 0.75
+
+    # --- Answer generation (opt-in; default is free retrieval-only mode) --------
+    llm_provider: Literal["none", "anthropic", "openai"] = "none"
+    llm_model: str | None = None  # per-provider default chosen in agent/llm.py
 
     # --- Storage ---------------------------------------------------------------
     data_dir: Path = Path("./data")
@@ -68,6 +75,8 @@ class Settings(BaseSettings):
     def _provider_keys_present(self) -> Settings:
         if self.embedding_provider == "openai" and not self.openai_api_key:
             raise ValueError("EMBEDDING_PROVIDER=openai requires OPENAI_API_KEY to be set")
+        if self.llm_provider == "openai" and not self.openai_api_key:
+            raise ValueError("LLM_PROVIDER=openai requires OPENAI_API_KEY to be set")
         return self
 
     @property

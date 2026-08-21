@@ -62,9 +62,23 @@ def judge_question(
     mode: str,
     threshold: float,
     k: int = 10,
+    settings=None,
 ) -> QueryJudgment:
-    result = retriever.search(question.question, k=k, mode=mode)
-    refused = result.top_vector_score < threshold
+    if mode == "agent":
+        # measure exactly what the agent retrieves: routing + fan-out + the
+        # entity guard and asymmetric refusal bars
+        from docintel.agent.plan import plan_retrieve, refusal_bar
+        from docintel.retrieve.service import RetrievalResult
+
+        decision, result = plan_retrieve(conn, retriever, question.question, k=k)
+        if result is None:
+            result = RetrievalResult(chunks=[], top_vector_score=0.0, latency_ms=0.0)
+            refused = True
+        else:
+            refused = result.top_vector_score < refusal_bar(settings, decision)
+    else:
+        result = retriever.search(question.question, k=k, mode=mode)
+        refused = result.top_vector_score < threshold
     relevance = [
         any(spec.matches(chunk) for spec in question.expected) for chunk in result.chunks
     ]
@@ -119,11 +133,12 @@ def run_eval(
     golden: list[GoldenQuestion],
     mode: str,
     threshold: float,
+    settings=None,
 ) -> EvalRun:
     retriever = Retriever(conn, provider, version)
     judgments = []
     for question in golden:
-        judgment = judge_question(conn, retriever, question, mode, threshold)
+        judgment = judge_question(conn, retriever, question, mode, threshold, settings=settings)
         judgments.append(judgment)
         logger.info(
             "%s %s %s: first_rel=%s top_vec=%.3f%s",

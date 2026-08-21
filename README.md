@@ -114,6 +114,35 @@ moves recall by ~0.024 — differences under ~0.05 are noise):
   high similarity. The Phase 5 relevance grader is the second line of defense;
   its effect will be measured against the same golden set.
 
+## The agent (LangGraph)
+
+`docintel ask` runs route → retrieve → grade → answer | refuse
+([diagram](docs/agent_graph.md)), bounded to one deterministic rewrite, with
+every run logged to `query_runs` (route, chunk ids, scores, tokens, latency,
+refusal). It runs **with zero API keys**: rule-based routing, entity-aware
+grading, and extractive answers that quote evidence verbatim with citations
+(`LLM_PROVIDER=anthropic|openai` upgrades answering to grounded generation).
+
+Measured effect of agent planning vs. plain hybrid retrieval (v3, same golden set):
+
+| configuration | recall@5 | recall@10 | MRR@10 | refusal P / R | p95 |
+|---|---|---|---|---|---|
+| plain hybrid | 0.60 | 0.68 | 0.55 | 1.00 / 0.50 | 71ms |
+| agent-planned | 0.65 | 0.76 | 0.54 | **1.00 / 1.00** | 778ms |
+
+- **Refusals fixed completely** (recall 0.50 → 1.00 at precision 1.00): the
+  entity guard refuses questions naming non-corpus companies regardless of
+  cosine score, and no-entity queries face a higher bar (0.75) — the closest
+  call in the OOC set passed at 0.748 cosine, a 0.002 margin, which is why
+  the Phase-5-optional LLM grader remains on the roadmap.
+- **Comparison fan-out works**: both companies appear in the evidence for
+  every answered comparison; single-fact recall@5 rose 0.83 → 0.92 from
+  company-filtered retrieval.
+- **Honest residual**: temporal recall@5 is unchanged at 0.25 — evidence from
+  both filings now lands in the top 10 (recall@10 rose 0.68 → 0.76) but two
+  accession-pinned specs rarely both fit in five slots. Latency also rises
+  (one embedding + search per fan-out leg).
+
 ## Layout
 
 ```

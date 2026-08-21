@@ -66,6 +66,17 @@ class Retriever:
     def _params(self, k: int) -> dict:
         return {"strategy": self.version.strategy, "params_hash": self.version.params_hash, "k": k}
 
+    @staticmethod
+    def _filters(companies: list[str] | None, accessions: list[str] | None) -> tuple[str, dict]:
+        where, params = "", {}
+        if companies:
+            where += " AND d.company = ANY(%(companies)s)"
+            params["companies"] = companies
+        if accessions:
+            where += " AND c.document_id = ANY(%(accessions)s)"
+            params["accessions"] = accessions
+        return where, params
+
     def _rows(self, sql: str, params: dict) -> list[RetrievedChunk]:
         with self.conn.cursor() as cur:
             cur.execute(sql, params)
@@ -77,33 +88,44 @@ class Retriever:
                 for i, r in enumerate(cur.fetchall())
             ]
 
-    def vector_search(self, question: str, k: int = 10) -> list[RetrievedChunk]:
+    def vector_search(
+        self, question: str, k: int = 10,
+        companies: list[str] | None = None, accessions: list[str] | None = None,
+    ) -> list[RetrievedChunk]:
         vec = "[" + ",".join(f"{x:.8f}" for x in self.provider.embed_query(question)) + "]"
+        extra_where, extra_params = self._filters(companies, accessions)
         sql = _SELECT.format(
             score="1 - (e.embedding <=> %(vec)s::vector)",
             extra_join=f"JOIN {self.version.table_name} e ON e.content_hash = c.content_hash",
-            where="",
+            where=extra_where,
             order="e.embedding <=> %(vec)s::vector",
         )
-        return self._rows(sql, {**self._params(k), "vec": vec})
+        return self._rows(sql, {**self._params(k), **extra_params, "vec": vec})
 
-    def fts_search(self, question: str, k: int = 10) -> list[RetrievedChunk]:
+    def fts_search(
+        self, question: str, k: int = 10,
+        companies: list[str] | None = None, accessions: list[str] | None = None,
+    ) -> list[RetrievedChunk]:
+        extra_where, extra_params = self._filters(companies, accessions)
         sql = _SELECT.format(
             score="ts_rank_cd(c.tsv, websearch_to_tsquery('english', %(q)s))",
             extra_join="",
-            where="AND c.tsv @@ websearch_to_tsquery('english', %(q)s)",
+            where="AND c.tsv @@ websearch_to_tsquery('english', %(q)s)" + extra_where,
             order="score DESC",
         )
-        return self._rows(sql, {**self._params(k), "q": question})
+        return self._rows(sql, {**self._params(k), **extra_params, "q": question})
 
-    def search(self, question: str, k: int = 10, mode: str = "hybrid") -> RetrievalResult:
+    def search(
+        self, question: str, k: int = 10, mode: str = "hybrid",
+        companies: list[str] | None = None, accessions: list[str] | None = None,
+    ) -> RetrievalResult:
         started = time.perf_counter()
         if mode == "vector":
-            chunks = self.vector_search(question, k)
+            chunks = self.vector_search(question, k, companies, accessions)
             top_vec = chunks[0].score if chunks else 0.0
         elif mode == "hybrid":
-            vec_list = self.vector_search(question, CANDIDATE_POOL)
-            fts_list = self.fts_search(question, CANDIDATE_POOL)
+            vec_list = self.vector_search(question, CANDIDATE_POOL, companies, accessions)
+            fts_list = self.fts_search(question, CANDIDATE_POOL, companies, accessions)
             top_vec = vec_list[0].score if vec_list else 0.0
             fused: dict[int, float] = {}
             by_id: dict[int, RetrievedChunk] = {}

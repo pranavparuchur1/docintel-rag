@@ -231,12 +231,69 @@ def query(
     typer.echo(f"latency={result.latency_ms:.0f}ms top_vector={result.top_vector_score:.3f}")
 
 
+@app.command()
+def ask(
+    question: str = typer.Argument(...),
+    index_version: int = typer.Option(..., "--index-version"),
+    mode: str = typer.Option("hybrid", help="vector | hybrid"),
+    k: int = typer.Option(10),
+) -> None:
+    """Ask the agent: route -> retrieve (fan-out) -> grade -> answer | refuse."""
+    from docintel import db
+    from docintel.agent.graph import AgentRuntime, run_agent
+    from docintel.agent.llm import get_answerer
+    from docintel.embed.providers import get_provider
+    from docintel.embed.service import get_index_version
+    from docintel.retrieve.service import Retriever
+
+    settings = _settings()
+    with db.connect(settings) as conn:
+        version = get_index_version(conn, index_version)
+        runtime = AgentRuntime(
+            conn=conn, settings=settings,
+            retriever=Retriever(conn, get_provider(settings), version),
+            answerer=get_answerer(settings),
+        )
+        result = run_agent(runtime, question, k=k, mode=mode)
+
+    color = typer.colors.YELLOW if result.refused else typer.colors.GREEN
+    typer.secho(
+        f"route={result.route} refused={result.refused} rewritten={result.rewritten} "
+        f"top_vector={result.top_vector_score:.3f} latency={result.latency_ms:.0f}ms "
+        f"run_id={result.run_id}",
+        fg=color,
+    )
+    typer.echo(result.answer)
+    if result.citations:
+        typer.echo("\ncitations:")
+        for citation in result.citations:
+            typer.echo(f"  - {citation}")
+
+
+@app.command("export-graph")
+def export_graph() -> None:
+    """Write the agent graph as a Mermaid diagram to docs/agent_graph.md."""
+    from pathlib import Path
+    from unittest.mock import Mock
+
+    from docintel.agent.graph import build_graph
+
+    mermaid = build_graph(Mock()).get_graph().draw_mermaid()
+    out = Path("docs/agent_graph.md")
+    out.write_text(
+        "# Agent graph\n\nExported by `docintel export-graph`.\n\n"
+        f"```mermaid\n{mermaid}```\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"wrote {out}")
+
+
 @app.command("eval")
 def eval_cmd(
     index_version: list[int] = typer.Option(
         None, "--index-version", help="Version(s) to evaluate; repeatable. Default: all ready."
     ),
-    mode: str = typer.Option("both", help="vector | hybrid | both"),
+    mode: str = typer.Option("both", help="vector | hybrid | agent | both, or comma list"),
     golden_path: str = typer.Option("eval/golden.yaml", help="Golden question set."),
     name: str = typer.Option(None, help="Report filename (under docs/eval/)."),
 ) -> None:
@@ -251,7 +308,7 @@ def eval_cmd(
 
     settings = _settings()
     golden = load_golden(Path(golden_path))
-    modes = ["vector", "hybrid"] if mode == "both" else [mode]
+    modes = mode.replace("both", "vector,hybrid").split(",")
     provider = get_provider(settings)
     runs = []
     with db.connect(settings) as conn:
@@ -267,7 +324,10 @@ def eval_cmd(
             for m in modes:
                 typer.echo(f"evaluating v{version.index_version_id} {version.strategy} / {m} ...")
                 runs.append(
-                    run_eval(conn, provider, version, golden, m, settings.refusal_threshold)
+                    run_eval(
+                        conn, provider, version, golden, m,
+                        settings.refusal_threshold, settings=settings,
+                    )
                 )
         report = write_report(runs, golden, Path("docs/eval"), name=name)
     for run in runs:

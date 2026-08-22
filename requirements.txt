@@ -5,7 +5,7 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 typer==0.15.1
 click==8.1.8  # typer 0.15 breaks against click >= 8.2 (make_metavar signature change)
-pydantic==2.10.4
+pydantic==2.13.4  # floor raised by fastapi 0.141 / mcp 2.0 / langgraph 1.2
 pydantic-settings==2.7.1
 httpx==0.28.1
 psycopg[binary]==3.2.3

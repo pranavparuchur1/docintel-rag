@@ -5,9 +5,15 @@ embeds them into a **versioned vector index**, serves grounded answers with cita
 through a LangGraph agent, and — critically — **measures its own retrieval quality**
 against a golden question set instead of claiming it works.
 
-> **Status: under construction.** Built phase by phase; nothing is claimed here
-> without a measured number behind it. The evaluation table will appear in this
-> README when the eval harness (Phase 4) produces it.
+Runs end to end with **zero paid API keys** on `docker compose`. Nothing in
+this README is claimed without a measured number behind it.
+
+🏗 [Architecture diagram](docs/architecture.md) ·
+🕸 [Agent graph](docs/agent_graph.md) ·
+📊 [Latest eval report](docs/eval/comparison_2026-08-21.md) ·
+📜 [Design decisions (ADRs)](docs/decisions/) ·
+🎥 3-minute walkthrough: *Loom link coming — script in
+[docs/walkthrough_script.md](docs/walkthrough_script.md)*
 
 ## Principles
 
@@ -22,20 +28,31 @@ against a golden question set instead of claiming it works.
 - **Zero paid keys required** — local embeddings (bge-small on CPU), local Postgres +
   pgvector, all via Docker Compose. Cloud providers are opt-in env vars.
 
-## Quickstart (Phase 0 scope)
+## Quickstart (clean clone, zero paid keys)
 
 ```bash
-cp .env.example .env          # edit EDGAR_USER_AGENT to identify yourself
+cp .env.example .env          # edit EDGAR_USER_AGENT to identify yourself (SEC requires it)
 docker compose up -d db       # Postgres 16 + pgvector
 docker compose build app
 docker compose run --rm app docintel db upgrade
 docker compose run --rm app docintel db check
-make test                     # unit tests (any Python >= 3.11 env with requirements-dev.txt)
 
-# ingest one company (Apple), or the whole 6-company corpus:
-docker compose run --rm app docintel ingest --cik 320193 --forms 10-K,10-Q --limit 2
-make corpus
+# ingest one company (Apple) to try it out — or `make corpus` for all six
+docker compose run --rm app docintel ingest --cik 320193 --forms 10-K --limit 1
+docker compose run --rm app docintel chunk --strategy all
+docker compose run --rm app docintel parse-report   # measured section-detection hit rate
+docker compose run --rm app docintel embed          # bge-small on CPU; incremental by content hash
+docker compose run --rm app docintel index-versions
+
+# ask (retrieval-only answers with citations; set LLM_PROVIDER for generation)
+docker compose run --rm app docintel ask "What risks does Apple report about its supply chain?" --index-version 1
+docker compose run --rm app docintel eval --mode hybrid,agent   # writes docs/eval/*.md
+make serve                                          # FastAPI on :8000
 ```
+
+Unit tests and lint (any Python ≥ 3.11 env): `pip install -r requirements-dev.txt
+&& pip install --no-deps -e .`, then `make test` and `make lint` (needs the
+compose db running for the Postgres-backed tests; they skip otherwise).
 
 Ingestion is idempotent: re-running the same command re-downloads nothing and
 duplicates nothing (the EDGAR accession number is the natural key). The EDGAR
@@ -105,14 +122,13 @@ moves recall by ~0.024 — differences under ~0.05 are noise):
   more chunks compete for the same k slots.
 - **Single-fact recall@5 is 0.83; cross-company is 0.25–0.30 and temporal
   0.12–0.31.** Single-shot retrieval rarely covers two sources in five slots —
-  this measured gap is exactly what the Phase 5 agent's per-company fan-out for
-  comparison queries exists to close, and the eval will be re-run through the
-  agent to prove it.
+  this measured gap is what the agent's per-company fan-out exists to close
+  (its measured effect is in the next section).
 - **Refusal at the swept threshold (0.68): precision 1.00, recall 0.50.**
   Cosine similarity alone cannot detect entity absence — "What supply chain
   risks does Walmart report?" retrieves other companies' supply-chain text at
-  high similarity. The Phase 5 relevance grader is the second line of defense;
-  its effect will be measured against the same golden set.
+  high similarity. The agent's entity-aware grader is the second line of
+  defense; its measured effect is in the next section.
 
 ## The agent (LangGraph)
 
@@ -199,5 +215,56 @@ configs/        declarative chunking/eval configuration
 
 ## Design decisions
 
-Recorded as ADRs in [docs/decisions/](docs/decisions/), starting with
-[why there is no MinIO here](docs/decisions/0001-raw-store-on-local-disk-not-minio.md).
+Full rationale as ADRs in [docs/decisions/](docs/decisions/); the short version:
+
+- **Content-addressed, versioned embeddings** — vectors keyed by chunk text
+  hash in one physical table per index version; rebuilds are cheap, cutover is
+  zero-downtime, and a re-run costs nothing
+  ([ADR 0002](docs/decisions/0002-content-addressed-versioned-embeddings.md)).
+- **HNSW over IVFFlat** — no training step, so recall stays correct under
+  incremental inserts (same ADR).
+- **Adapters at every expensive boundary** — `VECTOR_BACKEND`,
+  `EMBEDDING_PROVIDER`, `LLM_PROVIDER` are env switches; the free local path is
+  the default and the tested one.
+- **Chunking compared, never assumed** — three strategies behind one interface,
+  ranked by the same golden set (table above).
+- **Refusal thresholds are measured, not guessed** — 0.68 / 0.75 (no-entity)
+  come from the report's threshold sweep, and refusal quality is itself part of
+  the eval.
+- **No MinIO** — ~20 immutable filings, one writer; `documents.raw_path` is the
+  seam if the corpus outgrows a disk
+  ([ADR 0001](docs/decisions/0001-raw-store-on-local-disk-not-minio.md)).
+- **Orchestration stays thin** — the [Airflow DAG](dags/docintel_pipeline.py)
+  shells out to the same CLI a human runs; retries are safe because idempotency
+  lives in the pipeline (natural keys + content hashes), not the scheduler.
+
+## Known limitations
+
+Named deliberately — each one is a measurement or a conscious scope call:
+
+- **Golden-set verification is incomplete**: all 42 in-corpus questions are
+  mechanically validated (`docintel check-golden`), but **0/50 are
+  human-verified** yet; every eval report prints that count.
+- **Small corpus, small question set**: 18 filings, 42 scored questions — one
+  question moves recall@5 by ~0.024, so a 95% CI on recall@5 ≈ ±0.15. The
+  numbers rank configurations; they are not population estimates.
+- **Embedding-model ceiling**: bge-small-en-v1.5 (384-dim, CPU) caps semantic
+  quality; the versioned index exists precisely so a better model is a new
+  version + cutover, not a migration.
+- **Temporal questions**: recall@5 stuck at 0.25 even with fan-out (both
+  filings reach the top 10, rarely the top 5 together).
+- **Refusal edge**: the hardest out-of-corpus question cleared by 0.002 cosine.
+  Deterministic guards got refusal to 1.00/1.00 on this set, but the set is 8
+  questions.
+- **JPMorgan's Item 7** is ~400 chars in the primary document (MD&A
+  incorporated by reference) — a corpus property, not a parser bug.
+- **Ops**: in-process rate limiter (per-worker), per-leg query embedding is
+  uncached (agent p95 ≈ 0.8s), single-machine Compose deployment.
+
+## With more time
+
+LLM-graded relevance behind the deterministic guard (measured against the same
+golden set before adoption) · query-embedding cache · cross-encoder reranking as
+a fourth compared configuration · human verification of all 50 golden questions
+· a second embedding model as index version v5 to demonstrate live A/B ·
+Prometheus-format `/metrics`.

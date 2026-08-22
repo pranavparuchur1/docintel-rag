@@ -194,6 +194,19 @@ def embed_pending(
     return stats
 
 
+def get_latest_ready_version(conn: psycopg.Connection) -> IndexVersion:
+    """Serving default: the most recently created 'ready' index version."""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT {_VERSION_COLS} FROM index_versions WHERE status = 'ready' "
+            "ORDER BY created_at DESC, index_version_id DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+    if row is None:
+        raise ValueError("no ready index version — run `docintel embed`")
+    return _row_to_version(row)
+
+
 def list_index_versions(conn: psycopg.Connection) -> list[dict]:
     with conn.cursor() as cur:
         cur.execute(

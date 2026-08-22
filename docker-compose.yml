@@ -36,5 +36,24 @@ services:
     volumes:
       - ./data:/app/data
 
+  # `docker compose --profile serve up api` serves the HTTP API.
+  api:
+    build: .
+    profiles: ["serve"]
+    command: docintel serve --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://docintel:docintel@db:5432/docintel
+      EDGAR_USER_AGENT: ${EDGAR_USER_AGENT:?set EDGAR_USER_AGENT in .env (Name email@domain.com)}
+      DATA_DIR: /app/data
+      TIKTOKEN_CACHE_DIR: /app/data/.tiktoken
+      HF_HOME: /app/data/.hf
+    volumes:
+      - ./data:/app/data
+
 volumes:
   pgdata:

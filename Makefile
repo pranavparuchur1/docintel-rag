@@ -46,6 +46,9 @@ query:
 eval:
 	$(COMPOSE_RUN) docintel eval
 
+serve:
+	docker compose --profile serve up api
+
 test:
 	pytest
 

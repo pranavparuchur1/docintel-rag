@@ -270,6 +270,28 @@ def ask(
             typer.echo(f"  - {citation}")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8000),
+) -> None:
+    """Serve the FastAPI app (POST /query, GET /health, GET /metrics)."""
+    import uvicorn
+
+    from docintel.api.app import create_app
+
+    uvicorn.run(create_app(_settings()), host=host, port=port)
+
+
+@app.command("mcp-serve")
+def mcp_serve() -> None:
+    """Serve the corpus as MCP tools over stdio (for Claude Desktop/Code etc)."""
+    _settings()  # fail fast before the client sees a broken server
+    from docintel.mcp.server import main as mcp_main
+
+    mcp_main()
+
+
 @app.command("export-graph")
 def export_graph() -> None:
     """Write the agent graph as a Mermaid diagram to docs/agent_graph.md."""

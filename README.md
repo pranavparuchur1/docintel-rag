@@ -143,6 +143,49 @@ Measured effect of agent planning vs. plain hybrid retrieval (v3, same golden se
   accession-pinned specs rarely both fit in five slots. Latency also rises
   (one embedding + search per fan-out leg).
 
+## Serving: HTTP API and MCP
+
+`docintel serve` (or `make serve` for the containerized version) exposes:
+
+- `POST /query` — the full agent (validated input, per-IP rate limit)
+- `GET /health` — db, pgvector, and the index version being served
+- `GET /metrics` — query count, refusal rate, p50/p95 latency from `query_runs`
+
+`docintel mcp-serve` exposes the corpus as **MCP tools** over stdio —
+`search_filings(query, company?, form_type?, k)`, `get_chunk(chunk_id)`,
+`list_companies()`, `get_eval_report()` — so any MCP client can use the corpus
+as a tool. Claude Desktop / Claude Code config:
+
+```json
+{
+  "mcpServers": {
+    "docintel": {
+      "command": "docintel",
+      "args": ["mcp-serve"],
+      "cwd": "/path/to/docintel-rag"
+    }
+  }
+}
+```
+
+Session transcript — the official `mcp` Python client (2.0.0) driving the
+server over stdio, answering a corpus question end to end:
+
+```text
+$ connected to 'docintel' over stdio (official mcp 2.0.0 Python client)
+$ tools/list -> search_filings, get_chunk, list_companies, get_eval_report
+
+$ call search_filings(query='risks from export controls on China', company='nvidia', k=3)
+    chunk=18358 score=0.032 NVIDIA CORP 10-Q Item 1A. Risk Factors
+      "As a result, export controls have in the past and may in the future negatively impact demand..."
+    chunk=17615 score=0.032 NVIDIA CORP 10-K Item 1A. Risk Factors
+      "Excessive or shifting export controls have already and may in the future encourage customers..."
+
+$ call get_chunk(18358)
+    NVIDIA CORP 10-Q filed 2026-05-20, Item 1A. Risk Factors, 674 chars
+    source: https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/nvda-20260426.htm
+```
+
 ## Layout
 
 ```
